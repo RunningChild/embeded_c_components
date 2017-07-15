@@ -9,6 +9,7 @@ extern "C" {
 
 #define COMMON_LIBS_VERSION                 VERSION(1, 0, 3, 0)
 
+#define APP_ERROR_HANDLER()                 while(1)
 #define ENTER_REGION_SECTION()              INT_Disable()
 #define EXIT_REGION_SECTION()               INT_Enable()
 #define MEM_FREE(p)                         free_overwrite(p)
