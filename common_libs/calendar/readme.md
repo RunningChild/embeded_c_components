@@ -43,8 +43,29 @@
 
 以下是具体的代码举例：
 
-	//wallClockTimeBase:开机时刻的时间戳
-	//wallClockOverflowCnt:硬件定时器溢出次数
+在这里讲述的硬件定时器，需要具备如下能力：芯片在外部断电期间，能够通过该外挂纽扣电池继续给该硬件定时器和备份域供电。
+
+以EFM32GG系列为例，该硬件定时器为burtc。
+
+
+重点关注硬件定时器几个参数：
+
+1）每秒走过的计数值`COUNTS_PER_SEC`
+
+2）计数最大值`RTC_COUNTER_MASK`
+
+通过以上参数，能够获取1个溢出周期内走过的秒数：
+
+    /* Set overflow interval based on counter width and frequency */
+    overflow_interval  =  ((uint64_t)UINT32_MAX+1) / COUNTS_PER_SEC; /* in seconds */
+    overflow_interval_r = ((uint64_t)UINT32_MAX+1) % COUNTS_PER_SEC; /* division remainder */
+
+在整个实现过程，需要保存 万年历起始时间，和 计数溢出次数，到备份域。
+
+
+
+	//wallClockTimeBase:万年历起始时间戳
+	//wallClockOverflowCnt:硬件定时器计数溢出次数
 	extern volatile uint32_t  wallClockTimeBase;
 	extern volatile uint32_t  wallClockOverflowCnt;	
 	
