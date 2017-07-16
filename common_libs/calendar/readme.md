@@ -10,7 +10,7 @@
 
 
 
-#### 第一种具体做法
+### 第一种具体做法
 
 1）系统开机时刻，从时钟芯片上读取当前硬件万年历时间，一般能取到year-month-day hour:minute:second，有时还有时区。
 
@@ -29,4 +29,153 @@
 
 详见`datetime.c`实现。
 
+### 第二种具体做法
+直接操作硬件寄存器即可
+
+### 第三种具体做法
+1）重新实现接口`set_system_clock()`
+
+2）重新实现接口`get_wall_clock_time()`
+
+详见`calendar_enhance.c`实现。
+
+3) 外部需要定义以上两个接口实现所需要的其他接口。`clock_gettime()`和`clock_settime()`
+
+以下是具体的代码举例：
+
+	//wallClockTimeBase:开机时刻的时间戳
+	//wallClockOverflowCnt:硬件定时器溢出次数
+	extern volatile uint32_t  wallClockTimeBase;
+	extern volatile uint32_t  wallClockOverflowCnt;	
+	
+	//对外函数接口
+	/***************************************************************************//**
+	 * @brief wallclock_set_timebase
+	 ******************************************************************************/
+	__STATIC_INLINE void wallclock_set_timebase(uint32_t timebase)
+	{
+	    wallClockTimeBase = timebase;
+	}
+	
+	/***************************************************************************//**
+	 * @brief wallclock_get_timebase
+	 ******************************************************************************/
+	__STATIC_INLINE uint32_t wallclock_get_timebase(void)
+	{
+	    return wallClockTimeBase;
+	}
+	
+	/***************************************************************************//**
+	 * @brief wallclock_set_overflowcnt
+	 ******************************************************************************/
+	__STATIC_INLINE void wallclock_set_overflowcnt(uint32_t overflowcnt)
+	{
+	    wallClockOverflowCnt = overflowcnt;
+	}
+	
+	/***************************************************************************//**
+	 * @brief wallclock_get_overflowcnt
+	 ******************************************************************************/
+	__STATIC_INLINE uint32_t wallclock_get_overflowcnt(void)
+	{
+	    return wallClockOverflowCnt;
+	}
+
+
+
+以EFM32GG系列为例，片上有一个一直在运行的硬件定时器的外设burtc
+
+	//RTC_DIVIDER：外设时钟分频比
+	//RTC_CLOCK：外设时钟频率
+	#define BURTC_PRESCALING                        (RTC_DIVIDER)
+	#define COUNTS_PER_SEC                          (RTC_CLOCK/BURTC_PRESCALING)
+	
+	static uint32_t overflow_interval;
+	static uint32_t overflow_interval_r;
+	
+	/*****************************************************************************
+	 * @brief  Backup CALENDAR to retention registers
+	 *   RET[0].REG : number of BURTC overflows
+	 *   RET[1].REG : epoch offset
+	 ******************************************************************************/
+	static void clock_backup(void)
+	{
+		uint32_t burtcOverflowCounter = wallclock_get_overflowcnt();
+		uint32_t burtcStartTime = wallclock_get_timebase();
+		
+		/* Write overflow counter to retention memory */
+		BURTC_RetRegSet(0, burtcOverflowCounter);
+		
+		/* Write local epoch offset to retention memory */
+		BURTC_RetRegSet(1, burtcStartTime);
+	}
+	
+	/******************************************************************************
+	 * @brief Returns the current system time
+	 *
+	 * @param timer
+	 *   If not a null pointer, time is copied to this
+	 *
+	 * @return
+	 *   Current system time. Should, but does not, return -1 if system time is not available
+	 *
+	 *****************************************************************************/
+	uint32_t clock_gettime(void)
+	{
+	    uint32_t burtcOverflowCounter = wallclock_get_overflowcnt();
+	
+	    /* Add the time offset */
+	    uint32_t t = wallclock_get_timebase();
+	
+	    /* Add time based on number of counter overflows*/
+	    t += burtcOverflowCounter * overflow_interval;
+	
+	    /* Correct if overflow interval is not an integer*/
+	    if ( overflow_interval_r != 0 )
+	    {
+	        t += burtcOverflowCounter * overflow_interval_r / COUNTS_PER_SEC;
+	    }
+	
+	    /* Add the number of seconds for BURTC */
+	    t += (BURTC_CounterGet() / COUNTS_PER_SEC);
+	
+	    return t;
+	}
+	
+	/*****************************************************************************
+	 * @brief Set the epoch offset
+	 ******************************************************************************/
+	void clock_settime(const uint32_t set_timestamp)
+	{
+	    uint32_t burtcOverflowCounter = wallclock_get_overflowcnt();
+	
+	    //这里，不能改变burtc的cnt值
+	    uint32_t burtcStartTime = set_timestamp;
+	    burtcStartTime -= (BURTC_CounterGet() / COUNTS_PER_SEC);
+	    burtcStartTime -= burtcOverflowCounter * overflow_interval;
+	    if ( overflow_interval_r != 0 )
+	    {
+	        burtcStartTime -= burtcOverflowCounter * overflow_interval_r / COUNTS_PER_SEC;
+	    }
+	
+	    //更新开始时间戳，并保存到备份域
+	    wallclock_set_timebase(burtcStartTime);
+	    LOG(LEVEL_DEBUG, "settime TimeBase=%d", wallclock_get_timebase());
+	    clock_backup();
+	}
+	
+	/*****************************************************************************
+	 * @brief hal_burtc_over_flow_irq_process
+	 * @该接口需要在burtc定时器溢出中断中被执行
+	 ******************************************************************************/
+	void hal_burtc_over_flow_irq_process(void)
+	{
+	    uint32_t overflowcnt = wallclock_get_overflowcnt();
+	
+	    //更新溢出值
+	    wallclock_set_overflowcnt(overflowcnt++);
+	
+	    //保存到备份域
+	    clock_backup();
+	}
 
