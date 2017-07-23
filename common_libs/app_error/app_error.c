@@ -9,7 +9,7 @@
 void app_error_handler(void)
 {
     //异常处理，在这里死循环，等待硬狗复位系统
-    APP_ERROR_HANDLER();
+    APP_CHECK_ERROR_HANDLER();
 }
 
 /**@brief Function for error handling, which is called when an error has occurred.
