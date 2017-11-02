@@ -4,29 +4,26 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "common.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define IsLeapYear(yr)  (!((yr) % 400) || (((yr) % 100) && !((yr) % 4)))
-#define YearLength(yr)  (IsLeapYear(yr) ? 366 : 365)
+#define IsLeapYear(yr)      (!((yr) % 400) || (((yr) % 100) && !((yr) % 4)))
 
-//UTC started at 00:00:00 January 1, 2000
-#define BEGYEAR                     (2000)
-
-//24 hours * 60 minutes * 60 seconds
-#define DAY                         (86400UL)
-
-//2000-01-01 is sat
-#define SYSTEM_ORIGIN_DAY_OF_WEEK   (Sat)
-#define LENGTH_OF_WEEK              (7)
+#define YearLength(yr)      (IsLeapYear(yr) ? 366 : 365)
 
 // number of seconds since 0 hrs, 0 minutes, 0 seconds, on the
-//1st of January 2000 UTC
-//used to store the second counts for RTC
-typedef uint32_t UTCTime;
+// 1st of January 2000 UTC
+typedef uint32_t            UTCTime; /* used to store the second counts for RTC */
+
+#define BEGYEAR             2000     // UTC started at 00:00:00 January 1, 2000
+
+#define DAY                 86400UL  // 24 hours * 60 minutes * 60 seconds
+
+//2000-01-01 is sat
+#define SYSTEM_ORIGIN_DAY_OF_WEEK (Sat)
+#define LENGTH_OF_WEEK      (7)
+
 
 // To be used with
 typedef struct
@@ -40,8 +37,7 @@ typedef struct
 }
 UTCTimeStruct;
 
-typedef enum
-{
+typedef enum {
     Mon  = 0,
     Tue  = 1,
     Wed  = 2,
@@ -56,18 +52,27 @@ typedef union
     uint32_t data;
     UTCTimeStruct time;
 } time_union_t;
+/* time bit field */
 
 
 //函数指针
+typedef void (*timer_init_callback_t)(void);                    //由外部实现 1秒周期性定时器初始化
+typedef void (*timer_restart_callback_t)(uint32_t ms_interval); //由外部实现 1秒周期性定时器的重启
+typedef void (*timer_hander_callback_t)(void);                  //由外部实现 1秒周期性定时器的timeout hander
 typedef void (*calendar_gettime_t)(UTCTimeStruct* time);        //由外部实现 获取外部时钟芯片的时间
 
 
-//对外函数接口
+//外部函数接口
+void calendar_set_system_clock(time_union_t time, bool need_update);
+void calendar_get_wall_clock_time(UTCTimeStruct * utc_time, bool extern_src);
+
 void set_system_clock(time_union_t time, bool need_update);
 void get_wall_clock_time(UTCTimeStruct * utc_time, bool extern_src);
+
 bool is_systme_clock_valid (void);
 void ConvertToUTCTime( UTCTimeStruct *tm, UTCTime secTime );
 DAY_OF_WEEK get_day_of_week(UTCTimeStruct utc_time);
+
 UTCTime get_second_wallclock(void);
 UTCTime get_second_counter(void);
 uint32_t get_second_in_hour(void);

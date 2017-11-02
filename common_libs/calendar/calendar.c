@@ -5,16 +5,14 @@
 #include "log.h"
 
 #ifndef CALENDAR_TIMER_MS_INTERVAL
-#define CALENDAR_TIMER_MS_INTERVAL              (1000)
+#define CALENDAR_TIMER_MS_INTERVAL   (1000)
 #endif
 
 static timer_restart_callback_t calendar_timer_restart = NULL;
 static calendar_gettime_t calendar_time_get = NULL;
 
-/*This value should be stored in flash*/
-volatile static UTCTime    SecondCountRTC;
-
-volatile static UTCTime    second_wallclock;
+volatile static UTCTime    second_wallclock;      /*This value should be stored in flash*/
+volatile static UTCTime    SecondCountRTC;      /*This value should be stored in flash*/
 static uint32_t            second_in_hour;
 static uint32_t            hour_count;
 
@@ -80,13 +78,9 @@ void ConvertToUTCTime( UTCTimeStruct *tm, UTCTime secTime )
 }
 
 /******************************************************************************
- * @brief set_system_clock
- * @实际是更新SecondCountRTC值
- * @一般在系统开机时，从外部硬件万年历更新
- * @bool need_update: false 不更新内部软件万年历时间
-                      true  更新内部软件万年历时间
+ * @brief calendar_set_system_clock
  *****************************************************************************/
-__attribute__(( weak )) void set_system_clock(time_union_t time, bool need_update)
+void calendar_set_system_clock(time_union_t time, bool need_update)
 {
     if(false == need_update)
     {
@@ -129,11 +123,9 @@ __attribute__(( weak )) void set_system_clock(time_union_t time, bool need_updat
 }
 
 /******************************************************************************
- * @brief get_wall_clock_time
- * @bool extern_src: false 内部软件万年历时间
-                     true  外部硬件万年历时间
+ * @brief calendar_get_wall_clock_time
  *****************************************************************************/
-__attribute__(( weak )) void get_wall_clock_time(UTCTimeStruct * utc_time, bool extern_src)
+void calendar_get_wall_clock_time(UTCTimeStruct * utc_time, bool extern_src)
 {
     if (NULL == utc_time)
         return;
@@ -272,7 +264,7 @@ static void update_wall_clock(void)
     second_in_hour = SecondCountRTC % 3600;
     hour_count = (SecondCountRTC / 3600 ) % 24;
 
-//    LOG(LEVEL_DEBUG,"[update_wall_clock]%d",SecondCountRTC);
+//    LOG(LEVEL_DEBUG, "hour=%d, second_hour=%d, second_count=%d", hour_count, second_in_hour, SecondCountRTC);
 }
 
 /**************************************************************************
@@ -280,17 +272,9 @@ static void update_wall_clock(void)
 ***************************************************************************/
 void calendar_init(timer_init_callback_t timer_init, timer_restart_callback_t timer_restart, timer_hander_callback_t *timer_hander, calendar_gettime_t get_time)
 {
-    if( (NULL == timer_init)
-      ||(NULL == timer_restart) )
-    {
-        return;
-    }
-
     /* Init ticks from RTC */
     second_wallclock = 0;
-
-    /* This should read from flash */
-    SecondCountRTC = 0;
+    SecondCountRTC = 0;       /* This should read from flash */
 
     timer_init();
 
